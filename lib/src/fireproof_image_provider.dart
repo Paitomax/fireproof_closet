@@ -3,6 +3,7 @@ import 'dart:ui' as ui;
 
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:fireproof_closet/src/constants.dart';
+import 'package:fireproof_closet/src/util.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
@@ -10,15 +11,15 @@ import 'cached_data.dart';
 
 /// Loads from cloud or cache a given Firebase Storage [Reference] as Uint8List
 ///
-/// This is essentially a different network downloading implementation of [FireproofImage]
+/// This is essentially a different network downloading implementation of [FireproofImageProvider]
 /// tailored to Firebase Storage
 @immutable
-class FireproofImage extends ImageProvider<FireproofImage> {
+class FireproofImageProvider extends ImageProvider<FireproofImageProvider> {
   /// Creates an object that decodes a [Uint8List] buffer as an image.
   ///
   /// The arguments must not be null.
-  const FireproofImage({
-    required this.storageRef,
+  const FireproofImageProvider({
+    required this.url,
     this.cacheDuration = kDefaultDuration,
     this.cache = true,
     this.breakCache = false,
@@ -27,7 +28,7 @@ class FireproofImage extends ImageProvider<FireproofImage> {
   });
 
   /// Firebase Storage [Reference]
-  final Reference storageRef;
+  final String url;
 
   /// Max size of getData() item before an exception is thrown (defaults to 104.9MB)
   final int maxSize;
@@ -51,25 +52,26 @@ class FireproofImage extends ImageProvider<FireproofImage> {
   final double scale;
 
   @override
-  Future<FireproofImage> obtainKey(ImageConfiguration configuration) {
-    return SynchronousFuture<FireproofImage>(this);
+  Future<FireproofImageProvider> obtainKey(ImageConfiguration configuration) {
+    return SynchronousFuture<FireproofImageProvider>(this);
   }
 
   @override
-  ImageStreamCompleter loadBuffer(FireproofImage key, DecoderBufferCallback decode) {
+  ImageStreamCompleter loadBuffer(
+      FireproofImageProvider key, DecoderBufferCallback decode) {
     return MultiFrameImageStreamCompleter(
       codec: _loadAsync(key, decode),
       scale: key.scale,
-      debugLabel: "FireproofImage(${storageRef.toString()})",
+      debugLabel: "FireproofImage($url)",
       informationCollector: () => <DiagnosticsNode>[
-        DiagnosticsProperty<FireproofImage>('Image provider', this),
-        DiagnosticsProperty<FireproofImage>('Image key', key),
+        DiagnosticsProperty<FireproofImageProvider>('Image provider', this),
+        DiagnosticsProperty<FireproofImageProvider>('Image key', key),
       ],
     );
   }
 
   Future<ui.Codec> _loadAsync(
-    FireproofImage key,
+    FireproofImageProvider key,
     DecoderBufferCallback decode,
   ) async {
     try {
@@ -80,14 +82,18 @@ class FireproofImage extends ImageProvider<FireproofImage> {
         evict();
       }
 
+      final storageRef = getRefFromUrl(Uri.parse(url));
+
       // First attempt to retrieve the image from cache (unless breakCache)
-      final Uint8List? cachedBytes = (breakCache) ? null : await CachedData.getFromCache(storageRef);
+      final Uint8List? cachedBytes =
+          (breakCache) ? null : await CachedData.getFromCache(url);
 
       // If not in cache or expired, fetch the data from Firebase Storage
       final Uint8List? bytes = cachedBytes ?? await storageRef.getData(maxSize);
 
       if (bytes == null) {
-        throw Exception('No data in cache and FireproofImage getData() returned null.');
+        throw Exception(
+            'No data in cache and FireproofImage getData() returned null.');
       }
 
       if (bytes.lengthInBytes == 0) {
@@ -96,10 +102,12 @@ class FireproofImage extends ImageProvider<FireproofImage> {
 
       // Cache the data if cachedBytes was null and cache == true
       if (cachedBytes == null && cache) {
-        CachedData.saveToPersistentCache(storageRef: storageRef, bytes: bytes, cacheDuration: cacheDuration);
+        CachedData.saveToPersistentCache(
+            url: url, bytes: bytes, cacheDuration: cacheDuration);
       }
 
-      final ui.ImmutableBuffer buffer = await ui.ImmutableBuffer.fromUint8List(bytes);
+      final ui.ImmutableBuffer buffer =
+          await ui.ImmutableBuffer.fromUint8List(bytes);
 
       return decode(buffer);
     } catch (e) {
@@ -120,13 +128,16 @@ class FireproofImage extends ImageProvider<FireproofImage> {
       return false;
     }
 
-    return other is FireproofImage && other.storageRef.fullPath == storageRef.fullPath && other.scale == scale;
+    return other is FireproofImageProvider &&
+        other.url == url &&
+        other.scale == scale;
   }
 
   // Required to utilize ImageProvider's hot memory caching system
   @override
-  int get hashCode => Object.hash(storageRef.fullPath, scale);
+  int get hashCode => Object.hash(url, scale);
 
   @override
-  String toString() => '${objectRuntimeType(this, 'FireproofImage')}("${storageRef.toString()}", scale: $scale)';
+  String toString() =>
+      '${objectRuntimeType(this, 'FireproofImage')}("$url", scale: $scale)';
 }

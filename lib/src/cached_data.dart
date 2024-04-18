@@ -1,4 +1,5 @@
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:fireproof_closet/src/util.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:hive/hive.dart';
@@ -36,10 +37,10 @@ class CachedData {
 
   /// Get Bytes consumable by the FireproofImage ImageProvider from cache
   /// Returns null if they are not in the cache
-  static Future<Uint8List?> getFromCache(Reference storageRef) async {
+  static Future<Uint8List?> getFromCache(String url) async {
     LazyBox<CachedData> box = Hive.lazyBox<CachedData>(kDatabaseName);
 
-    final CachedData? cachedData = await box.get(storageRef.fullPath);
+    final CachedData? cachedData = await box.get(url);
 
     if (cachedData == null) {
       return null;
@@ -56,10 +57,10 @@ class CachedData {
   }
 
   /// Check if Cached
-  static bool isCached(Reference storageRef) {
+  static bool isCached(String url) {
     LazyBox<CachedData> box = Hive.lazyBox<CachedData>(kDatabaseName);
 
-    bool cached = box.containsKey(storageRef.fullPath);
+    bool cached = box.containsKey(url);
 
     return cached;
   }
@@ -68,7 +69,7 @@ class CachedData {
   /// Caches an already downloaded Firebase Storage reference
   /// and its bytes for future use.
   static Future<void> saveToPersistentCache({
-    required Reference storageRef,
+    required String url,
     required Uint8List bytes,
     Duration cacheDuration = kDefaultDuration,
   }) async {
@@ -81,10 +82,10 @@ class CachedData {
     DateTime expires = now.add(cacheDuration);
 
     // Construct the entire cache object
-    CachedData cachedData = CachedData(storageRef.fullPath, bytes, now, expires);
+    CachedData cachedData = CachedData(url, bytes, now, expires);
 
     // Write the data
-    await box.put(storageRef.fullPath, cachedData);
+    await box.put(url, cachedData);
 
     return;
   }
@@ -92,15 +93,17 @@ class CachedData {
   /// Download And Cache
   static Future<void> downloadAndCache({
     required BuildContext? context,
-    required Reference storageRef,
+    required String url,
     required Duration cacheDuration,
     required bool breakCache,
   }) async {
     try {
       // breakCache == false and file is already cached, return early because there is nothing to do
-      if (!breakCache && isCached(storageRef)) {
+      if (!breakCache && isCached(url)) {
         return;
       }
+
+      final storageRef = getRefFromUrl(Uri.parse(url));
 
       // Download the image from Firebase Storage based on the reference
       final Uint8List? bytes = await storageRef.getData();
@@ -110,10 +113,10 @@ class CachedData {
       }
 
       // Save it to locale persistent cache (overwrites existing data)
-      saveToPersistentCache(storageRef: storageRef, bytes: bytes, cacheDuration: cacheDuration);
+      saveToPersistentCache(url: url, bytes: bytes, cacheDuration: cacheDuration);
 
       // Create the image provider for [ImageCache] hot memory
-      FireproofImage imageProvider = FireproofImage(storageRef: storageRef, breakCache: true);
+      FireproofImageProvider imageProvider = FireproofImageProvider(url: url, breakCache: true);
 
       // Evict the provider from [ImageCache] hot memory
       await imageProvider.evict();
@@ -141,12 +144,15 @@ class CachedData {
     // For each key clear from the hot [ImageCache]
     List<Future> evictFutures = box.keys.map((key) {
       // Any image provider, does not have to be "real"
-      FireproofImage imageProvider = FireproofImage(storageRef: FirebaseStorage.instance.ref(key));
+      FireproofImageProvider imageProvider = FireproofImageProvider(url: key);
       return imageProvider.evict();
     }).toList();
 
     // Wait for the clearing to be done
     await Future.wait(evictFutures);
+
+    imageCache.clear();
+    imageCache.clearLiveImages();
 
     return;
   }
@@ -177,7 +183,7 @@ class CachedData {
 
     // For each key clear from the hot [ImageCache]
     List<Future<ImageCacheStatus?>> aliveFutures = box.keys.map((key) {
-      FireproofImage imageProvider = FireproofImage(storageRef: FirebaseStorage.instance.ref(key));
+      FireproofImageProvider imageProvider = FireproofImageProvider(url: key);
       return imageProvider.obtainCacheStatus(configuration: ImageConfiguration.empty);
     }).toList();
 

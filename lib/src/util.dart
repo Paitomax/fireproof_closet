@@ -1,24 +1,16 @@
 import 'package:firebase_storage/firebase_storage.dart';
 
-/// Storage Reference to Hash
-int storageRefToHash(Reference storageRef) {
-  String string = storageRef.fullPath;
-
-  return stringToHash(string);
+Uri getUrlFromRef(Reference ref) {
+  final link = "gs://${ref.bucket}/${ref.fullPath}";
+  return Uri.parse(link);
 }
 
-/// Create an ID for the Isar database out of the Firebase Storage Reference
-int stringToHash(String string) {
-  int hash = 0xcbf29ce484222325;
+FirebaseStorage getStorageFromUrl(Uri uri) {
+  return FirebaseStorage.instanceFor(bucket: getBucketFromUrl(uri));
+}
 
-  var i = 0;
-  while (i < string.length) {
-    final codeUnit = string.codeUnitAt(i++);
-    hash ^= codeUnit >> 8;
-    hash *= 0x100000001b3;
-    hash ^= codeUnit & 0xFF;
-    hash *= 0x100000001b3;
-  }
+String getBucketFromUrl(Uri url) => '${url.scheme}://${url.authority}';
 
-  return hash;
+Reference getRefFromUrl(Uri url) {
+  return getStorageFromUrl(url).ref(url.path);
 }

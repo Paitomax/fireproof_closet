@@ -34,14 +34,14 @@ class FireproofCloset {
   /// If [breakCache] is true, downloadAndCache will perform a fresh download even if the image is already in cache.
   /// to invalidate the [ImageCache] hot memory ImageProvider singleton cache.
   static Future<void> downloadAndCache(
-    Reference storageRef, {
+    String url, {
     BuildContext? context,
     Duration cacheDuration = kDefaultDuration,
     bool breakCache = false,
   }) =>
       CachedData.downloadAndCache(
         context: context,
-        storageRef: storageRef,
+        url: url,
         cacheDuration: cacheDuration,
         breakCache: breakCache,
       );
