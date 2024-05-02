@@ -121,6 +121,15 @@ class FireproofImageProvider extends ImageProvider<FireproofImageProvider> {
     }
   }
 
+  @override
+  Future<bool> evict({
+    ImageCache? cache,
+    ImageConfiguration configuration = ImageConfiguration.empty,
+  }) async {
+    await CachedData.removeFromCache(url);
+    return super.evict(cache: cache, configuration: configuration);
+  }
+
   // Required to utilize ImageProvider's hot memory caching system
   @override
   bool operator ==(Object other) {

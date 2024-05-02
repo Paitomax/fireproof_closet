@@ -65,6 +65,12 @@ class CachedData {
     return cached;
   }
 
+  /// Remove cached image
+  static Future<void> removeFromCache(String url) {
+    LazyBox<CachedData> box = Hive.lazyBox<CachedData>(kDatabaseName);
+    return box.delete(url);
+  }
+
   /// Cache Now
   /// Caches an already downloaded Firebase Storage reference
   /// and its bytes for future use.
@@ -122,7 +128,7 @@ class CachedData {
       await imageProvider.evict();
 
       // Load it into the [ImageCache] hot memory cache system
-      if (context != null) {
+      if (context != null && context.mounted) {
         precacheImage(imageProvider, context);
       }
 
