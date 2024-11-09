@@ -1,6 +1,7 @@
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:fireproof_closet/hive_registrar.g.dart';
 import 'package:flutter/material.dart';
-import 'package:hive_flutter/adapters.dart';
+import 'package:hive_ce_flutter/adapters.dart';
 
 import 'cached_data.dart';
 import 'constants.dart';
@@ -15,8 +16,8 @@ class FireproofCloset {
     // Init Hive
     await Hive.initFlutter();
 
-    // Register Type Adapter
-    Hive.registerAdapter(CachedDataAdapter());
+    // Register Type Adapters
+    Hive.registerAdapters();
 
     // Open the database
     await Hive.openLazyBox<CachedData>(kDatabaseName);
