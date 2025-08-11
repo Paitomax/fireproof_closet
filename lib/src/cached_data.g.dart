@@ -8,7 +8,7 @@ part of 'cached_data.dart';
 
 class CachedDataAdapter extends TypeAdapter<CachedData> {
   @override
-  final int typeId = 169;
+  final typeId = 169;
 
   @override
   CachedData read(BinaryReader reader) {
