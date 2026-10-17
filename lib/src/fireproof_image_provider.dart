@@ -57,8 +57,10 @@ class FireproofImageProvider extends ImageProvider<FireproofImageProvider> {
   }
 
   @override
-  ImageStreamCompleter loadBuffer(
-      FireproofImageProvider key, DecoderBufferCallback decode) {
+  ImageStreamCompleter loadImage(
+    FireproofImageProvider key,
+    ImageDecoderCallback decode,
+  ) {
     return MultiFrameImageStreamCompleter(
       codec: _loadAsync(key, decode),
       scale: key.scale,
@@ -72,7 +74,7 @@ class FireproofImageProvider extends ImageProvider<FireproofImageProvider> {
 
   Future<ui.Codec> _loadAsync(
     FireproofImageProvider key,
-    DecoderBufferCallback decode,
+    ImageDecoderCallback decode,
   ) async {
     try {
       assert(key == this);
@@ -85,15 +87,17 @@ class FireproofImageProvider extends ImageProvider<FireproofImageProvider> {
       final storageRef = getRefFromUrl(Uri.parse(url));
 
       // First attempt to retrieve the image from cache (unless breakCache)
-      final Uint8List? cachedBytes =
-          (breakCache) ? null : await CachedData.getFromCache(url);
+      final Uint8List? cachedBytes = (breakCache)
+          ? null
+          : await CachedData.getFromCache(url);
 
       // If not in cache or expired, fetch the data from Firebase Storage
       final Uint8List? bytes = cachedBytes ?? await storageRef.getData(maxSize);
 
       if (bytes == null) {
         throw Exception(
-            'No data in cache and FireproofImage getData() returned null.');
+          'No data in cache and FireproofImage getData() returned null.',
+        );
       }
 
       if (bytes.lengthInBytes == 0) {
@@ -103,13 +107,17 @@ class FireproofImageProvider extends ImageProvider<FireproofImageProvider> {
       // Cache the data if cachedBytes was null and cache == true
       if (cachedBytes == null && cache) {
         CachedData.saveToPersistentCache(
-            url: url, bytes: bytes, cacheDuration: cacheDuration);
+          url: url,
+          bytes: bytes,
+          cacheDuration: cacheDuration,
+        );
       }
 
-      final ui.ImmutableBuffer buffer =
-          await ui.ImmutableBuffer.fromUint8List(bytes);
+      final ui.ImmutableBuffer buffer = await ui.ImmutableBuffer.fromUint8List(
+        bytes,
+      );
 
-      return decode(buffer);
+      return await decode(buffer);
     } catch (e) {
       // Depending on where the exception was thrown, the image cache may not
       // have had a chance to track the key in the cache at all.
